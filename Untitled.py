@@ -14,195 +14,14 @@
 # ---
 
 from random import sample, seed, choice
-
-import networkx as nx
-
-from nx_concorde.graph import calc_tour
-
-graph = nx.generators.random_geometric_graph(20, 0.4, seed=42)
-
-seed(42)
-visit_nodes = sample(graph.nodes(), 7)
-visit_nodes
-
-pos = nx.layout.spring_layout(graph, seed=42)
-node_color = [1 if node in visit_nodes else 0 for node in graph.nodes()]
-
-nx.draw(
-    graph,
-    pos=pos,
-    node_color=node_color,
-    with_labels=True,
-    cmap="cool"
-)
-
-tour = calc_tour(graph, start_node=0, end_node=1, visit_nodes=visit_nodes)
-
-# +
-labels = {}
-
-for idx, node in enumerate(tour):
-    labels[node] = labels.get(node, []) + [str(idx)]
-    
-labels = {node: ", ".join(idxs) for node, idxs in labels.items()}
-# -
-
-nx.draw(
-    graph,
-    pos=pos,
-    node_color=node_color,
-    labels=labels,
-    with_labels=True,
-    cmap="cool"
-)
-
-graph = nx.generators.random_geometric_graph(50, 0.2, seed=42)
-graph = graph.subgraph(max(nx.connected_components(graph), key=len))
-len(graph.nodes())
-
-seed(42)
-start_node = choice(list(graph.nodes().keys()))
-end_node = choice(list(graph.nodes().keys()))
-visit_nodes = list(sample(graph.nodes(), 5))
-
-from profilehooks import profile
-
-import numpy as np
-
-
-# +
-@profile(immediate=True)
-def calc_path_matrix_1(graph):
-    return np.array(
-        [
-            [nx.astar_path(graph, source, target) for target in graph.nodes()]
-            for source in graph.nodes()
-        ],
-        dtype="object",
-    )
-
-matrix1 = calc_path_matrix_1(graph)    
-# -
-
 import functools
 
-# +
-nx.astar_path_cached = functools.lru_cache(maxsize=None)(nx.astar_path)
+import networkx as nx
+import matplotlib.pyplot as plt
+from scipy.spatial import distance
 
-@profile(immediate=True)
-def calc_path_matrix_2(graph):
-    nx.astar_path_cached.cache_clear()    
-    matrix = []
-    for source in graph.nodes():
-        row = []
-        for target in graph.nodes():
-            if source > target:
-                source_, target_ = target, source
-                reverse = True
-            else:
-                source_, target_ = source, target
-                reverse = False
-            path = nx.astar_path_cached(graph, source_, target_)
-            if reverse:
-                path = path[::-1]
-            row.append(path)
-        matrix.append(row)
-    return np.array(matrix, dtype="object")
-
-matrix2 = calc_path_matrix_2(graph)
-# -
-
-import math
-
-# +
-pos = nx.layout.spring_layout(graph, seed=42)
-
-# eucledian
-def heuristic(source, target):
-    x0, y0 = pos[source]
-    x1, y1 = pos[target]
-    return math.sqrt(math.pow(x0 - x1, 2) + math.pow(y0 - y1, 2))
-
-for (source, target), data in graph.edges().items():
-    data["weight"] = heuristic(source, target)
-# -
-
-for (source, target), data in graph.edges().items():
-    data["weight"] = heuristic(source, target)
-
-
-# +
-@profile(immediate=True)
-def calc_path_matrix_3(graph, heuristic=None, weight="weight"):
-    nx.astar_path_cached.cache_clear()    
-    matrix = []
-    for source in graph.nodes():
-        row = []
-        for target in graph.nodes():
-            if source > target:
-                source_, target_ = target, source
-                reverse = True
-            else:
-                source_, target_ = source, target
-                reverse = False
-            path = nx.astar_path_cached(graph, source_, target_, heuristic=heuristic, weight=weight)
-            if reverse:
-                path = path[::-1]
-            row.append(path)
-        matrix.append(row)
-    return np.array(matrix, dtype="object")
-
-matrix3 = calc_path_matrix_3(graph, heuristic)
-# -
-
-graph = nx.generators.random_geometric_graph(200, 0.2, seed=42)
-graph = graph.subgraph(max(nx.connected_components(graph), key=len))
-len(graph.nodes())
-
-# +
-pos = nx.layout.spring_layout(graph, seed=42)
-
-# eucledian
-def eucledian(source, target):
-    x0, y0 = pos[source]
-    x1, y1 = pos[target]
-    return math.sqrt(math.pow(x0 - x1, 2) + math.pow(y0 - y1, 2))
-
-for (source, target), data in graph.edges().items():
-    data["weight"] = heuristic(source, target)
-
-
-# +
-@profile(immediate=True)
-def calc_path_matrix_4(graph, heuristic=None, weight="weight"):
-    nx.astar_path_cached.cache_clear()    
-    matrix = []
-    known_paths = {}
-    def _heuristic(source, target):
-        if source > target:
-            source, target = target, source
-        if (source, target) in known_paths:
-            return known_paths[(source, target)]
-        return heuristic(source, target)
-    for source in graph.nodes():
-        row = []
-        for target in graph.nodes():
-            if source > target:
-                source_, target_ = target, source
-                reverse = True
-            else:
-                source_, target_ = source, target
-                reverse = False
-            path = nx.astar_path_cached(graph, source_, target_, heuristic=_heuristic, weight=weight)
-            known_paths[(source_, target_)] = len(path)
-            if reverse:
-                path = path[::-1]
-            row.append(path)
-        matrix.append(row)
-    return np.array(matrix, dtype="object"), known_paths
-
-matrix4, known_paths = calc_path_matrix_4(graph, heuristic)
-# -
+from nx_concorde.graph import calc_path_matrix, calc_distance_matrix, calc_tour
+from nx_concorde.tsp import solve
 
 seed(42)
 graph = nx.grid_2d_graph(20, 20)
@@ -210,42 +29,104 @@ graph = graph.subgraph(sample(graph.nodes(), 250))
 graph = graph.subgraph(max(nx.connected_components(graph), key=len))
 len(graph)
 
-nx.draw(graph, pos={node: node for node in graph.nodes()})
+# +
+fig = plt.figure(figsize=(20, 20))
 
-from scipy.spatial import distance
+nx.draw(
+    graph,
+    pos={node: node for node in graph.nodes()},
+    ax=fig.gca(),
+    with_labels=True
+)
+# -
 
 block_distance = functools.partial(distance.minkowski, p=1)
 
-nx.astar_path_cached.cache_info()
+path_matrix = calc_path_matrix(graph, block_distance, nodes=None)
 
-from multiprocessing import Pool
+distance_matrix = calc_distance_matrix(graph, path_matrix)
 
+NUM_VISIT_NODES = 20
 
-def astar_path_factory(graph, heuristic=None, weight=None):
-    def astar_path(node_pair):
-        source, target = node_pair
-        return nx.astar_path(source=source, target=target, G=graph, heuristic=heuristic, weight=weight)
-    return astar_path
+visit_nodes = sorted(sample(graph.nodes(), k=NUM_VISIT_NODES))
 
+start_node = choice(list(graph.nodes()))
+end_node = choice(list(graph.nodes()))
 
-astar_path = astar_path_factory(graph, heuristic=block_distance)
+print((start_node, end_node))
 
-node_pairs = [(source, target) for target in graph.nodes() for source in graph.nodes() if target > source]
+distance_matrix = calc_tour(graph, start_node, end_node, visit_nodes, path_matrix, distance_matrix)
 
-from pathos.multiprocessing import ProcessingPool as Pool
+visit_nodes = [(None, None)] + sorted(set(visit_nodes + [start_node, end_node]))
 
-graph.nodes()
+dm = [
+    distance_matrix[frozenset((source, target))]
+    for idx_target, target in enumerate(visit_nodes)
+    for idx_source, source in enumerate(visit_nodes)
+    if idx_source > idx_target
+]
 
-astar_path(((0, 0), (0, 1)))
+from nx_concorde.graph import reshape_for_tsp_solver
 
-agents = 2
-chunksize = 3
+dm = reshape_for_tsp_solver(dm)
 
-with Pool(nodes=agents) as pool:
-    result = pool.map(astar_path, node_pairs)
+tour = solve(dm, len(visit_nodes), edge_weight_format="UPPER_ROW")
 
-len(result)
+tour = [val for val in tour if val != 0]
 
-node_pairs[100]
+tour
 
-result[100]
+print((visit_nodes.index(start_node), (visit_nodes.index(end_node))))
+
+from nx_concorde.graph import _reorder_tour
+
+visit_nodes.index(start_node)
+
+visit_nodes.index(end_node)
+
+tour
+
+tour = tour[::-1]
+
+start_node
+
+end_node
+
+visit_nodes
+
+tour
+
+# +
+path = []
+
+for source, target in zip(tour[:-1], tour[1:]):
+    sub_path = path_matrix[frozenset((visit_nodes[source], visit_nodes[target]))]
+    
+    if sub_path[0] != visit_nodes[source]:
+        sub_path = sub_path[::-1]
+    path.extend(sub_path[:-1])
+path.append(sub_path[-1])
+
+# +
+labels = {}
+
+for idx, node in enumerate(path):
+    labels[node] = labels.get(node, []) + [str(idx)]
+    
+labels = {node: ",\n".join(idxs) for node, idxs in labels.items()}
+# -
+
+visit_nodes
+
+# +
+fig = plt.figure(figsize=(20, 20))
+
+nx.draw(
+    graph,
+    pos={node: node for node in graph.nodes()},
+    ax=fig.gca(),
+    node_color=[1 if node in visit_nodes else 0 for node in graph.nodes()],
+    labels=labels,
+    with_labels=True,
+    cmap="cool",
+)
