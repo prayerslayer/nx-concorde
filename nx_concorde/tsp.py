@@ -1,9 +1,6 @@
 """
-This module provides functions to solve the Travelling Salesman (TSP) problem
-for a supermarket scenario.
+This module provides functions to solve the Travelling Salesman (TSP) problem.
 """
-
-import functools
 import tempfile
 from typing import List
 
@@ -12,7 +9,6 @@ import tsplib95
 from concorde.tsp import TSPSolver
 
 _EDGE_WEIGHT_TYPE = "EXPLICIT"
-_RANDOM_SEED = 42
 
 
 def _tsp_solver_factory(edge_weights: List, dimension: int, edge_weight_format: str):
@@ -35,25 +31,38 @@ def solve(
     Solves a TSP tour.
 
     Args:
-        edge_weights (List[List[float]]): Full matrix of distances between nodes.
+        edge_weights (List[List[float]]): Explicit edge weighs.
+        edge_weight_format (str): Format of the edge weights.
+
+    Returns:
+        List[int]: Tour of node indexes.
     """
     solver = _tsp_solver_factory(
         edge_weights, dimension=dimension, edge_weight_format=edge_weight_format
     )
-    solution = solver.solve(random_seed=_RANDOM_SEED)
+    solution = solver.solve()
     if not (solution.found_tour and solution.success):
         raise RuntimeError("No optimal route found.")
     return list(solution.tour)
 
 
-def reshape_for_tsp_solver(array: List):
-    def largest_prime_factor(n):
+def reshape_for_tsp_solver(edge_weights: List) -> List[List]:
+    """
+    Reshapes a flat list of edge weights into a 2-dimensional matrix
+    that can the TSP solver can understand.
+    """
+
+    def largest_prime_factor(num):
         i = 2
-        while i * i <= n:
-            if n % i:
+        while i * i <= num:
+            if num % i:
                 i += 1
             else:
-                n //= i
-        return n
+                num //= i
+        return num
 
-    return np.array(array).reshape(largest_prime_factor(len(array)), -1).tolist()
+    return (
+        np.array(edge_weights)
+        .reshape(largest_prime_factor(len(edge_weights)), -1)
+        .tolist()
+    )

@@ -1,20 +1,17 @@
 """
-
+This module contains functions to calculate TSP tours for networkx graphs.
 """
 
-from collections import OrderedDict
 from copy import copy
-from functools import lru_cache
 from typing import Dict, Hashable, List
 
 import networkx as nx
-import numpy as np
 from networkx.algorithms.shortest_paths.weighted import _weight_function
 from pathos.multiprocessing import ProcessingPool as Pool
 
 from .tsp import reshape_for_tsp_solver, solve
 
-_DUMMY_COORD = None
+_DUMMY_NODE = (None, None)
 _DUMMY_DISTANCE = 10_000
 
 
@@ -28,7 +25,10 @@ def _astar_path_factory(graph, heuristic=None, weight=None):
     return astar_path
 
 
-def calc_path_matrix(graph, heuristic=None, weight="weight", nodes=1):
+def calc_path_matrix(graph, heuristic=None, weight="weight", nodes=1) -> Dict:
+    """
+    Calculates a shortest path matrix between all combinations of nodes in the graph.
+    """
     astar_path = _astar_path_factory(graph, heuristic=heuristic, weight=weight)
     node_pairs = [
         (source, target)
@@ -41,16 +41,19 @@ def calc_path_matrix(graph, heuristic=None, weight="weight", nodes=1):
     return {frozenset(node_pair): path for node_pair, path in zip(node_pairs, paths)}
 
 
-def _calc_distance(graph, path, weight="weight"):
+def _calc_distance(graph, path, weight="weight") -> float:
     weight = _weight_function(graph, weight)
     return sum(weight(u, v, graph[u][v]) for u, v in zip(path[:-1], path[1:]))
 
 
 def calc_distance_matrix(
     graph, path_matrix=None, heuristic=None, weight="weight", nodes=1
-):
+) -> Dict:
+    """
+    Calculates the shortest path length matrix between all combinations of nodes in the graph.
+    """
     path_matrix = path_matrix or calc_path_matrix(
-        graph, heuristic=heuristic, weight=weight, nodes=1
+        graph, heuristic=heuristic, weight=weight, nodes=nodes
     )
     return {
         node_pair: _calc_distance(graph, path, weight)
@@ -58,45 +61,54 @@ def calc_distance_matrix(
     }
 
 
-def _extend_tour(tour: List[int], path_matrix: np.array) -> List[Hashable]:
-    tour_extended = []
-    for start, end in zip(tour[:-1], tour[1:]):
-        path = path_matrix[start][end]
-        tour_extended.extend(path[:-1])
-    tour_extended.append(path[-1])
-    return tour_extended
+def _extend_tour(tour: List[Hashable], path_matrix: Dict) -> List[Hashable]:
+    path = []
+
+    for source, target in zip(tour[:-1], tour[1:]):
+        sub_path = path_matrix[frozenset((source, target))]
+
+        if sub_path[0] != source:
+            sub_path = sub_path[::-1]
+        path.extend(sub_path[:-1])
+    path.append(sub_path[-1])
+    return path
 
 
-def _add_dummy_distance(distance_matrix, nodes, connected_nodes, inplace=False):
-    dummy_node = (_DUMMY_COORD, _DUMMY_COORD)
-    if not inplace:
+def _add_dummy_distance(distance_matrix, nodes, connected_nodes, in_place=False):
+    if not in_place:
         distance_matrix = copy(distance_matrix)
     for node in nodes:
-        distance_matrix[frozenset((node, dummy_node))] = (
+        distance_matrix[frozenset((node, _DUMMY_NODE))] = (
             0 if node in connected_nodes else _DUMMY_DISTANCE
         )
     return distance_matrix
-
-
-def _remove_dummy_node(tour):
-    return [idx for idx in tour if idx != max(tour)]
 
 
 def _calc_node_idx_map(graph: nx.Graph) -> Dict:
     return {node: idx for idx, node in enumerate(graph.nodes())}
 
 
-def _reorder_tour(tour: List[int], start: int = None, end: int = None):
+def _reorder_tour(tour: List[Hashable], start: Hashable = None, end: Hashable = None):
 
-    idx_start = [idx for idx, val in enumerate(tour) if val == start][0]
-    idx_end = [idx for idx, val in enumerate(tour) if val == end][0]
-    l = len(tour)
+    start_idx = tour.index(start)
+    end_idx = tour.index(end)
+    tour_length = len(tour)
     tour = 2 * tour
-    if tour[idx_start + l - 1] == end:
-        return tour[idx_start : idx_start + l]
-    return tour[idx_end : idx_end + l][::-1]
+    if tour[start_idx + tour_length - 1] == end:
+        return tour[start_idx : start_idx + tour_length]
+    return tour[end_idx : end_idx + tour_length][::-1]
 
 
+def _to_upper_row(distance_matrix: Dict, nodes: List) -> List:
+    return [
+        distance_matrix[frozenset((source, target))]
+        for idx_target, target in enumerate(nodes)
+        for idx_source, source in enumerate(nodes)
+        if idx_source > idx_target
+    ]
+
+
+# pylint: disable=too-many-arguments
 def calc_tour(
     graph,
     start_node: Hashable,
@@ -104,9 +116,12 @@ def calc_tour(
     visit_nodes: List[Hashable] = None,
     path_matrix: List = None,
     distance_matrix: List = None,
-    **kwargs,
 ) -> List[Hashable]:
-    path_matrix = path_matrix or calc_path_matrix(graph, **kwargs)
+    """
+    Calculates the TSP tour for graph that starts at start_node,
+    ends at end_node and passes all visit_nodes.
+    """
+    path_matrix = path_matrix or calc_path_matrix(graph)
     distance_matrix = distance_matrix or calc_distance_matrix(
         graph, path_matrix=path_matrix
     )
@@ -121,50 +136,18 @@ def calc_tour(
     distance_matrix = {
         node_pair: distance_matrix[node_pair] for node_pair in visit_node_pairs
     }
-    if start_node or end_node:
+    dummy = start_node or end_node
+    if dummy:
         distance_matrix = _add_dummy_distance(
             distance_matrix, visit_nodes, [start_node, end_node]
         )
-        visit_nodes.append((None, None))
-    return distance_matrix
-    distance_matrix = [
-        distance_matrix[frozenset((source, target))]
-        for target in visit_nodes
-        for source in visit_nodes
-        if target > source
-    ]
-    return distance_matrix
+        visit_nodes = [_DUMMY_NODE] + visit_nodes
+    distance_matrix = _to_upper_row(distance_matrix, visit_nodes)
     distance_matrix = reshape_for_tsp_solver(distance_matrix)
-    return distance_matrix
-
     tour = solve(distance_matrix, len(visit_nodes))
-    # tour = _remove_dummy_node(tour)
-    # tour = _reorder_tour(
-    #     tour, visit_nodes.index(start_node), visit_nodes.index(end_node)
-    # )
+    tour = [visit_nodes[idx] for idx in tour]
+    if dummy:
+        tour = [node for node in tour if node != _DUMMY_NODE]
+        tour = _reorder_tour(tour, start_node, end_node)
+    tour = _extend_tour(tour, path_matrix)
     return tour
-    # tour = _reorder_tour(tour, start_idx, end_idx)
-    # tour = _extend_tour(tour, path_matrix)
-    # return tour
-
-
-# def plot_graph(graph, **kwargs):
-#     kwargs["pos"] = kwargs.get("pos") or {
-#         key: (node["x"], node["y"]) for key, node in graph.nodes().items()
-#     }
-#     kwargs["with_labels"] = kwargs["with_labels"] if "with_labels" in kwargs else True
-#     kwargs["node_color"] = kwargs.get("node_color") or [
-#         0 if node["type"] == "ENTRANCE" else 0.5 if node["type"] == "ISLE" else 1
-#         for node in graph.nodes().values()
-#     ]
-#     nx.draw(graph, **kwargs)
-
-
-# def largest_prime_factor(n):
-#     i = 2
-#     while i * i <= n:
-#         if n % i:
-#             i += 1
-#         else:
-#             n //= i
-#     return n
