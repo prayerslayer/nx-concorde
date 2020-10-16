@@ -13,7 +13,6 @@ cache:
     - .venv
 
 before_install:
-  - bin/check_version
   - curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
   - source $HOME/.poetry/env
 
