@@ -114,8 +114,8 @@ def calc_tour(
     start_node: Hashable,
     end_node: Hashable,
     visit_nodes: List[Hashable] = None,
-    path_matrix: List = None,
-    distance_matrix: List = None,
+    path_matrix: Dict[Hashable] = None,
+    distance_matrix: Dict[Hashable] = None,
 ) -> List[Hashable]:
     """
     Calculates the TSP tour for graph that starts at start_node,
