@@ -1,0 +1,50 @@
+language: python
+python: "3.8"
+dist: xenial
+
+stages:
+  - lint
+  - test
+  - name: release
+    if: tag IS present
+
+cache:
+  paths:
+    - .venv
+
+before_install:
+  - curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
+  - source $HOME/.poetry/env
+
+install:
+  - poetry install -v
+
+jobs:
+  include:
+    - stage: lint
+      name: lint_black
+      script:
+        - make lint_black
+    - stage: lint
+      name: lint_pylint
+      script:
+        - make lint_pylint
+    - stage: lint
+      name: lint_prettier
+      language: node_js
+      node_js:
+        - "12"
+      before_install: skip
+      install: skip
+      script:
+        - make lint_prettier
+    - stage: test
+      python:
+        - "3.8"
+      script:
+        - poetry run pytest --cov=nx_concorde --cov-report term-missing tests/
+        - poetry run codecov
+    - stage: release
+      script:
+        - bin/check_release
+        - poetry publish --build
