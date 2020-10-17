@@ -3,7 +3,7 @@ This module contains functions to calculate TSP tours for networkx graphs.
 """
 
 from copy import copy
-from typing import Dict, Hashable, List
+from typing import Callable, Dict, Hashable, List
 
 import networkx as nx
 from networkx.algorithms.shortest_paths.weighted import _weight_function
@@ -25,7 +25,9 @@ def _astar_path_factory(graph, heuristic=None, weight=None):
     return astar_path
 
 
-def calc_path_matrix(graph, heuristic=None, weight="weight", nodes=1) -> Dict:
+def calc_path_matrix(
+    graph: nx.Graph, heuristic: Callable = None, weight: str = "weight", nodes: int = 1
+) -> Dict[Hashable, List[Hashable]]:
     """
     Calculates a shortest path matrix between all combinations of nodes in the graph.
     """
@@ -48,7 +50,7 @@ def _calc_distance(graph, path, weight="weight") -> float:
 
 def calc_distance_matrix(
     graph, path_matrix=None, heuristic=None, weight="weight", nodes=1
-) -> Dict:
+) -> Dict[Hashable, float]:
     """
     Calculates the shortest path length matrix between all combinations of nodes in the graph.
     """
@@ -61,7 +63,9 @@ def calc_distance_matrix(
     }
 
 
-def _extend_tour(tour: List[Hashable], path_matrix: Dict) -> List[Hashable]:
+def _extend_tour(
+    tour: List[Hashable], path_matrix: Dict[Hashable, List[Hashable]]
+) -> List[Hashable]:
     path = []
 
     for source, target in zip(tour[:-1], tour[1:]):
@@ -84,10 +88,6 @@ def _add_dummy_distance(distance_matrix, nodes, connected_nodes, in_place=False)
     return distance_matrix
 
 
-def _calc_node_idx_map(graph: nx.Graph) -> Dict:
-    return {node: idx for idx, node in enumerate(graph.nodes())}
-
-
 def _reorder_tour(tour: List[Hashable], start: Hashable = None, end: Hashable = None):
 
     start_idx = tour.index(start)
@@ -99,7 +99,9 @@ def _reorder_tour(tour: List[Hashable], start: Hashable = None, end: Hashable = 
     return tour[end_idx : end_idx + tour_length][::-1]
 
 
-def _to_upper_row(distance_matrix: Dict, nodes: List) -> List:
+def _to_upper_row(
+    distance_matrix: Dict[Hashable, float], nodes: List[Hashable]
+) -> List[float]:
     return [
         distance_matrix[frozenset((source, target))]
         for idx_target, target in enumerate(nodes)
@@ -114,8 +116,8 @@ def calc_tour(
     start_node: Hashable,
     end_node: Hashable,
     visit_nodes: List[Hashable] = None,
-    path_matrix: Dict[Hashable] = None,
-    distance_matrix: Dict[Hashable] = None,
+    path_matrix: Dict[Hashable, List[Hashable]] = None,
+    distance_matrix: Dict[Hashable, float] = None,
 ) -> List[Hashable]:
     """
     Calculates the TSP tour for graph that starts at start_node,

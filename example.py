@@ -13,6 +13,8 @@
 #     name: nx-concorde
 # ---
 
+# # nx-concorde example
+
 from random import sample, seed, choice
 import functools
 
@@ -22,46 +24,50 @@ from scipy.spatial import distance
 
 from nx_concorde.graph import calc_path_matrix, calc_distance_matrix, calc_tour
 
+# Creating a 2-dimensional, grid-like graph with some holes.
 seed(42)
-graph = nx.grid_2d_graph(20, 20)
-graph = graph.subgraph(sample(graph.nodes(), 250))
+graph = nx.grid_2d_graph(10, 10)
+graph = graph.subgraph(sample(graph.nodes(), 80))
 graph = graph.subgraph(max(nx.connected_components(graph), key=len))
-len(graph)
 
 # +
-fig = plt.figure(figsize=(20, 20))
+# Looking at the graph.
+fig = plt.figure(figsize=(10, 10))
 
 nx.draw(
     graph, pos={node: node for node in graph.nodes()}, ax=fig.gca(), with_labels=True
 )
 # -
 
+# For a grid graph, block distance is a good heuristic.
 block_distance = functools.partial(distance.minkowski, p=1)
 
-path_matrix = calc_path_matrix(graph, block_distance, nodes=None)
+# Calculating the path matrix. You can specify the number of threads with the `nodes` argument.
+path_matrix = calc_path_matrix(graph, block_distance, nodes=1)
 
+# Calculating the distance matrix from the node matrix.
 distance_matrix = calc_distance_matrix(graph, path_matrix)
 
+# Let's select 20 random nodes we want to visit.
 NUM_VISIT_NODES = 20
-
 visit_nodes = sorted(sample(graph.nodes(), k=NUM_VISIT_NODES))
 
+# Let's select a random start and end node.
 start_node = choice(list(graph.nodes()))
 end_node = choice(list(graph.nodes()))
-print((start_node, end_node))
 
+# We are calculating the optimal path that starts at start_node, ends at end_node and visits all visit_nodes.
 tour = calc_tour(graph, start_node, end_node, visit_nodes, path_matrix, distance_matrix)
 
-# +
+# Some labels to understand the path better.
 labels = {}
-
 for idx, node in enumerate(tour):
     labels[node] = labels.get(node, []) + [str(idx)]
-
 labels = {node: ",\n".join(idxs) for node, idxs in labels.items()}
 
 # +
-fig = plt.figure(figsize=(20, 20))
+# Let's plot the optimal tour.
+fig = plt.figure(figsize=(10, 10))
 
 nx.draw(
     graph,
@@ -75,4 +81,3 @@ nx.draw(
     with_labels=True,
     cmap="cool",
 )
-# -

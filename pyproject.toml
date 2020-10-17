@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nx-concorde"
-version = "0.1.0"
+version = "0.2.0"
 description = "Concorde TSP solver for networkx graphs."
 authors = ["Jan-Benedikt Jagusch <jan.jagusch@gmail.com>"]
 license = "MIT"

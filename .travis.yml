@@ -46,5 +46,4 @@ jobs:
         - poetry run codecov
     - stage: release
       script:
-        - bin/check_release
-        - poetry publish --build
+        - bin/check_release ${TRAVIS_TAG}
