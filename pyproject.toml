@@ -10,7 +10,7 @@ python = "^3.8"
 networkx = "~3.1"
 numpy = "^1.19.2"
 cython = "^0.29.21"
-pyconcorde = { git = "https://github.com/jvkersch/pyconcorde" }
+pyconcorde = { git = "https://github.com/prayerslayer/pyconcorde" }
 tsplib95 = { git = "https://github.com/prayerslayer/tsplib95" }
 scipy = "^1.5.2"
 pathos = "^0.2.6"

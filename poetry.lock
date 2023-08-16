@@ -1418,13 +1418,13 @@ develop = false
 [package.dependencies]
 cython = ">=0.22.0"
 numpy = ">=1.21.0"
-tsplib95 = "*"
+tsplib95 = {git = "https://github.com/prayerslayer/tsplib95"}
 
 [package.source]
 type = "git"
-url = "https://github.com/jvkersch/pyconcorde.git"
+url = "https://github.com/prayerslayer/pyconcorde"
 reference = "HEAD"
-resolved_reference = "5dd3c63cc07020c074fdc4efb0507b885feba64c"
+resolved_reference = "df0761f9e1dc8cb53c4f57064ca4058ff4f7e136"
 
 [[package]]
 name = "pycparser"
@@ -2159,4 +2159,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "148b3435af1da517b18f37e86440cb0f49bbf8b907ca3f073a3b3b8140e333d1"
+content-hash = "8e5b264a47128de845b54aaabc09284102bf9c367eaf15fa798b7882c9e49e28"
