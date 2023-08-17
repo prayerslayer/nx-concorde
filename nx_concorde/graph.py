@@ -34,9 +34,9 @@ def calc_path_matrix(
     astar_path = _astar_path_factory(graph, heuristic=heuristic, weight=weight)
     node_pairs = [
         (source, target)
-        for target in graph.nodes()
-        for source in graph.nodes()
-        if target > source
+        for idx_target, target in enumerate(graph.nodes())
+        for idx_source, source in enumerate(graph.nodes())
+        if idx_source > idx_target
     ]
     with Pool(nodes=nodes) as pool:
         paths = pool.map(astar_path, node_pairs)
@@ -131,9 +131,9 @@ def calc_tour(
     visit_nodes = sorted(set(visit_nodes + [start_node, end_node]))
     visit_node_pairs = [
         frozenset((source, target))
-        for target in visit_nodes
-        for source in visit_nodes
-        if target > source
+        for idx_target, target in enumerate(visit_nodes)
+        for idx_source, source in enumerate(visit_nodes)
+        if idx_source > idx_target
     ]
     distance_matrix = {
         node_pair: distance_matrix[node_pair] for node_pair in visit_node_pairs
